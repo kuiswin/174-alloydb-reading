@@ -1,0 +1,336 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIベクトル読書メモ | YOU-1 AlloyDB API</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css?v=1.4">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-container">
+                <span class="logo-badge">AlloyDB Omni</span>
+                <h1>AIベクトル読書メモ</h1>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <button id="btn-seed" onclick="triggerSeed()" class="btn-seed">サンプル100件を登録</button>
+                <div class="mode-badge">pgvector ✕ Ollama 駆動中</div>
+            </div>
+        </header>
+
+        <div class="card search-card">
+            <h2 class="card-title">AIセマンティック検索（意味やニュアンスで探す）</h2>
+            <form id="search-form" onsubmit="submitSearch(event)" class="search-form-row">
+                <input type="text" id="search-query" class="form-control search-input" placeholder="例：「友を信じて走るメロスの決意」や「桜の美しさとその下に眠るもの」、「目に見えない大切なこと」..." required>
+                <button type="submit" class="btn-search">AI類似探索</button>
+            </form>
+            <div id="search-results-container" class="search-results-container" style="display: none;">
+                <div class="search-results-header">
+                    <span>3大検索エンジンの比較（LIKE検索 vs トリグラム全文検索 vs AIベクトル検索）</span>
+                    <button onclick="clearSearch()" class="btn-clear-search">検索をクリア</button>
+                </div>
+                <div class="search-results-grid">
+                    <!-- Column 1: LIKE検索 -->
+                    <div class="search-column">
+                        <div class="column-header">
+                            <span class="column-badge badge-like">LIKE検索</span>
+                            <span class="column-desc">単純な文字パターン</span>
+                        </div>
+                        <div id="search-results-like" class="column-body"></div>
+                    </div>
+                    <!-- Column 2: 全文検索 (FTS Bi-gram) -->
+                    <div class="search-column">
+                        <div class="column-header">
+                            <span class="column-badge badge-fts">部分一致全文検索 (FTS Bi-gram)</span>
+                            <span class="column-desc">文字パターンの重なり類似度</span>
+                        </div>
+                        <div id="search-results-fts" class="column-body"></div>
+                    </div>
+                    <!-- Column 3: AIベクトル検索 (pgvector) -->
+                    <div class="search-column">
+                        <div class="column-header">
+                            <span class="column-badge badge-vector">AIベクトル検索 (pgvector)</span>
+                            <span class="column-desc">文章の意味・文脈の類似度</span>
+                        </div>
+                        <div id="search-results-vector" class="column-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-layout">
+            <div class="card form-card">
+                <h2 class="card-title">新しい読書メモの登録</h2>
+                <form id="memo-form" onsubmit="submitMemo(event)">
+                    <div class="form-group">
+                        <label for="title" class="form-label">書籍名 / 章のタイトル</label>
+                        <input type="text" id="title" class="form-control" placeholder="例：夏目漱石 こころ" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="memo" class="form-label">心に刻まれた一節・メモ</label>
+                        <textarea id="memo" class="form-control" rows="8" placeholder="例：精神的に向上心のないものは馬鹿だと言った、あの静かな断罪の冷たさが私の胸からずっと消えない。" required></textarea>
+                    </div>
+                    <button type="submit" class="btn-submit">ベクトル化して保存する</button>
+                </form>
+            </div>
+
+            <div class="card log-card">
+                <h2 class="card-title">登録済みの読書メモ一覧</h2>
+                <div id="memo-logs" class="contact-logs">
+                    <div class="loading-state">AlloyDB Omniからデータを取得中...</div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>AlloyDB Omni v15.5.0 &bull; pgvector (Vector Database) &bull; Ollama (all-minilm 384dim)</p>
+        </footer>
+    </div>
+
+    <script>
+        async function submitMemo(e) {
+            e.preventDefault();
+            const btn = document.querySelector('.btn-submit');
+            btn.disabled = true;
+            btn.textContent = 'AIベクトル変換＆保存中...';
+
+            const title = document.getElementById('title').value;
+            const memo = document.getElementById('memo').value;
+
+            try {
+                const res = await fetch('/api/memo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, memo })
+                });
+
+                if (res.ok) {
+                    document.getElementById('title').value = '';
+                    document.getElementById('memo').value = '';
+                    await fetchMemos();
+                } else {
+                    const err = await res.text();
+                    alert('エラーが発生しました: ' + err);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('通信に失敗しました。');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'ベクトル化して保存する';
+            }
+        }
+
+        async function submitSearch(e) {
+            e.preventDefault();
+            const query = document.getElementById('search-query').value;
+            const btn = document.querySelector('.btn-search');
+            const resultsContainer = document.getElementById('search-results-container');
+
+            const resultsLike = document.getElementById('search-results-like');
+            const resultsFTS = document.getElementById('search-results-fts');
+            const resultsVector = document.getElementById('search-results-vector');
+
+            btn.disabled = true;
+            btn.textContent = '比較中...';
+            resultsContainer.style.display = 'block';
+
+            const loadingHTML = '<div class="loading-state">検索中...</div>';
+            resultsLike.innerHTML = loadingHTML;
+            resultsFTS.innerHTML = loadingHTML;
+            resultsVector.innerHTML = loadingHTML;
+
+            try {
+                const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                if (!res.ok) throw new Error('探索に失敗しました');
+                const data = await res.json();
+
+                // 1. LIKE Results
+                if (!data.like || data.like.length === 0) {
+                    resultsLike.innerHTML = '<div class="empty-state">該当なし (0件)</div>';
+                } else {
+                    resultsLike.innerHTML = data.like.map(item => `
+                        <div class="search-result-item">
+                            <div class="search-result-header">
+                                <span class="search-result-title">${escapeHTML(item.title)}</span>
+                                <span class="search-result-score spec-like">一致</span>
+                            </div>
+                            <div class="search-result-msg">
+                                "${escapeHTML(item.memo)}"
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                // 2. FTS (Bi-gram) Results
+                if (!data.fts || data.fts.length === 0) {
+                    resultsFTS.innerHTML = '<div class="empty-state">該当なし (0件)</div>';
+                } else {
+                    resultsFTS.innerHTML = data.fts.map(item => `
+                        <div class="search-result-item">
+                            <div class="search-result-header">
+                                <span class="search-result-title">${escapeHTML(item.title)}</span>
+                                <span class="search-result-score spec-fts">類似: ${(item.score * 100).toFixed(0)}%</span>
+                            </div>
+                            <div class="search-result-msg">
+                                "${escapeHTML(item.memo)}"
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                // 3. AI Vector Results
+                if (!data.vector || data.vector.length === 0) {
+                    resultsVector.innerHTML = '<div class="empty-state">該当なし (0件)</div>';
+                } else {
+                    resultsVector.innerHTML = data.vector.map(item => `
+                        <div class="search-result-item">
+                            <div class="search-result-header">
+                                <span class="search-result-title">${escapeHTML(item.title)}</span>
+                                <span class="search-result-score spec-vector">意味類似: ${(item.score * 100).toFixed(0)}%</span>
+                            </div>
+                            <div class="search-result-msg">
+                                "${escapeHTML(item.memo)}"
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error(err);
+                const errHTML = '<div class="empty-state" style="color:#ef4444;">エラー</div>';
+                resultsLike.innerHTML = errHTML;
+                resultsFTS.innerHTML = errHTML;
+                resultsVector.innerHTML = errHTML;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'AI類似探索';
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('search-query').value = '';
+            document.getElementById('search-results-container').style.display = 'none';
+        }
+
+        let lastDataJSON = '';
+
+        async function fetchMemos() {
+            const container = document.getElementById('memo-logs');
+            try {
+                const res = await fetch('/api/memos');
+                if (!res.ok) throw new Error('API returned status ' + res.status);
+                const data = await res.json();
+
+                const currentDataJSON = JSON.stringify(data);
+                if (currentDataJSON === lastDataJSON) {
+                    return;
+                }
+                lastDataJSON = currentDataJSON;
+
+                if (!data || data.length === 0) {
+                    container.innerHTML = `<div class="empty-state">読書メモはまだありません。</div>`;
+                    return;
+                }
+
+                container.innerHTML = data.map(item => `
+                    <div class="log-item">
+                        <div class="log-header">
+                            <span class="log-id">ID: ${item.id.slice(0, 8)}...</span>
+                            <span class="log-time">${new Date(item.created_at).toLocaleString()}</span>
+                        </div>
+                        <div class="log-sender">
+                            <strong>${escapeHTML(item.title)}</strong>
+                        </div>
+                        <div class="log-msg">
+                            "${escapeHTML(item.memo)}"
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+                container.innerHTML = `<div class="empty-state" style="color:#ef4444;">データの取得に失敗しました。</div>`;
+                lastDataJSON = '';
+            }
+        }
+
+        function escapeHTML(str) {
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        async function triggerSeed() {
+            const btn = document.getElementById('btn-seed');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.className = 'btn-seed loading';
+            btn.textContent = '初期化中...';
+
+            try {
+                const res = await fetch('/api/seed', {
+                    method: 'POST'
+                });
+
+                if (!res.ok) {
+                    throw new Error('Seeding failed: ' + res.statusText);
+                }
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const progress = JSON.parse(line);
+                            btn.textContent = `生成中... ${progress.current}/${progress.total}件`;
+                        } catch (e) {
+                            console.error('Error parsing stream line:', e);
+                        }
+                    }
+                }
+
+                btn.textContent = '登録完了！';
+                btn.className = 'btn-seed success';
+                await fetchMemos();
+
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    btn.className = 'btn-seed';
+                }, 3000);
+
+            } catch (err) {
+                console.error(err);
+                alert('サンプルデータの登録に失敗しました。');
+                btn.disabled = false;
+                btn.textContent = originalText;
+                btn.className = 'btn-seed';
+            }
+        }
+
+        fetchMemos();
+        setInterval(fetchMemos, 5000);
+    </script>
+</body>
+</html>
