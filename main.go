@@ -222,8 +222,8 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 		log.Printf("LIKE search error: %v\n", err)
 	}
 
-	// 2. 全文検索 / FTS (Bi-gram類似度、最大5件)
-	ftsRows, err := db.Query("SELECT id, title, memo, created_at, bigm_similarity(memo, $1) as score FROM reading_memos WHERE bigm_similarity(memo, $1) > 0 ORDER BY score DESC LIMIT 5", query)
+	// 2. 全文検索 / FTS (Tri-gram類似度、最大5件)
+	ftsRows, err := db.Query("SELECT id, title, memo, created_at, similarity(memo, $1) as score FROM reading_memos WHERE similarity(memo, $1) > 0 ORDER BY score DESC LIMIT 5", query)
 	if err == nil {
 		defer ftsRows.Close()
 		for ftsRows.Next() {

@@ -46,11 +46,11 @@
                         </div>
                         <div id="search-results-like" class="column-body"></div>
                     </div>
-                    <!-- Column 2: Full-Text Search (Bi-gram) -->
+                    <!-- Column 2: Full-Text Search (pg_trgm) -->
                     <div class="search-column">
                         <div class="column-header">
-                            <span class="column-badge badge-fts">部分一致全文検索 (FTS Bi-gram)</span>
-                            <span class="column-desc">文字パターンの重なり類似度</span>
+                            <span class="column-badge badge-fts">部分一致全文検索 (FTS Tri-gram)</span>
+                            <span class="column-desc">文字パターンの重なり類似度 (pg_trgm)</span>
                         </div>
                         <div id="search-results-fts" class="column-body"></div>
                     </div>
@@ -170,7 +170,7 @@
                     `).join('');
                 }
 
-                // 2. FTS (Bi-gram) Results
+                // 2. FTS (Tri-gram) Results
                 if (!data.fts || data.fts.length === 0) {
                     resultsFTS.innerHTML = '<div class="empty-state">該当なし (0件)</div>';
                 } else {
