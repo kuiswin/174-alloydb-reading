@@ -1,16 +1,15 @@
-<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIベクトル読書メモ | YOU-1 AlloyDB API</title>
-
+    
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
-
+    
     <!-- Custom Style Sheet -->
     <link rel="stylesheet" href="style.css?v=1.4">
 </head>
@@ -39,7 +38,7 @@
                     <button onclick="clearSearch()" class="btn-clear-search">検索をクリア</button>
                 </div>
                 <div class="search-results-grid">
-                    <!-- Column 1: LIKE検索 -->
+                    <!-- Column 1: LIKE Search -->
                     <div class="search-column">
                         <div class="column-header">
                             <span class="column-badge badge-like">LIKE検索</span>
@@ -47,7 +46,7 @@
                         </div>
                         <div id="search-results-like" class="column-body"></div>
                     </div>
-                    <!-- Column 2: 全文検索 (FTS Bi-gram) -->
+                    <!-- Column 2: Full-Text Search (Bi-gram) -->
                     <div class="search-column">
                         <div class="column-header">
                             <span class="column-badge badge-fts">部分一致全文検索 (FTS Bi-gram)</span>
@@ -55,7 +54,7 @@
                         </div>
                         <div id="search-results-fts" class="column-body"></div>
                     </div>
-                    <!-- Column 3: AIベクトル検索 (pgvector) -->
+                    <!-- Column 3: AI Semantic Search (Vector) -->
                     <div class="search-column">
                         <div class="column-header">
                             <span class="column-badge badge-vector">AIベクトル検索 (pgvector)</span>
@@ -135,7 +134,7 @@
             const query = document.getElementById('search-query').value;
             const btn = document.querySelector('.btn-search');
             const resultsContainer = document.getElementById('search-results-container');
-
+            
             const resultsLike = document.getElementById('search-results-like');
             const resultsFTS = document.getElementById('search-results-fts');
             const resultsVector = document.getElementById('search-results-vector');
@@ -143,7 +142,7 @@
             btn.disabled = true;
             btn.textContent = '比較中...';
             resultsContainer.style.display = 'block';
-
+            
             const loadingHTML = '<div class="loading-state">検索中...</div>';
             resultsLike.innerHTML = loadingHTML;
             resultsFTS.innerHTML = loadingHTML;
@@ -282,7 +281,7 @@
                 const res = await fetch('/api/seed', {
                     method: 'POST'
                 });
-
+                
                 if (!res.ok) {
                     throw new Error('Seeding failed: ' + res.statusText);
                 }
@@ -313,7 +312,7 @@
                 btn.textContent = '登録完了！';
                 btn.className = 'btn-seed success';
                 await fetchMemos();
-
+                
                 setTimeout(() => {
                     btn.disabled = false;
                     btn.textContent = originalText;
