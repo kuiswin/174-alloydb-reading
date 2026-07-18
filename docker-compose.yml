@@ -18,14 +18,17 @@ services:
     depends_on:
       - alloydb-db
     entrypoint: >
-      bash -c "
+      sh -c "
         echo 'Waiting for AlloyDB Omni to wake up...' &&
         until pg_isready -h alloydb-db -U postgres; do
           sleep 2
         done &&
         export PGPASSWORD=postgres &&
         psql -h alloydb-db -U postgres -d reading_db -c 'CREATE EXTENSION IF NOT EXISTS vector;' &&
-        psql -h alloydb-db -U postgres -d reading_db -c 'CREATE EXTENSION IF NOT EXISTS pg_bigm;' &&
+        psql -h alloydb-db -U postgres -d reading_db -c 'CREATE EXTENSION IF NOT EXISTS alloydb_scann;' &&
+        psql -h alloydb-db -U postgres -d reading_db -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;' &&
+        psql -h alloydb-db -U postgres -d reading_db -c \"ALTER SYSTEM SET scann.enable_index_with_insufficient_data = 'on';\" &&
+        psql -h alloydb-db -U postgres -d reading_db -c \"SELECT pg_reload_conf();\" &&
         psql -h alloydb-db -U postgres -d reading_db -c '
           CREATE TABLE IF NOT EXISTS reading_memos (
             id VARCHAR(36) PRIMARY KEY,
@@ -34,7 +37,8 @@ services:
             embedding vector(384),
             created_at TIMESTAMPTZ NOT NULL
           );' &&
-        echo '🔥 AlloyDB Omni & pgvector initialization completed successfully!'
+        psql -h alloydb-db -U postgres -d reading_db -c \"SET scann.allow_blocked_operations = true; CREATE INDEX IF NOT EXISTS reading_memos_scann_idx ON reading_memos USING scann (embedding cosine) WITH (num_leaves=1);\" &&
+        echo '🔥 AlloyDB Omni & pgvector/ScaNN initialization completed successfully!'
       "
 
   # 3. Ollama (ローカルAI Embeddingsエンジン)
