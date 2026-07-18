@@ -9,11 +9,6 @@ services:
       - POSTGRES_DB=reading_db
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d reading_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
     restart: always
 
   # 2. AlloyDB & pgvector 拡張機能の自動有効化 + テーブル初期化
@@ -73,10 +68,8 @@ services:
     build: .
     container_name: alloydb-go-api
     depends_on:
-      alloydb-db:
-        condition: service_healthy
-      ollama:
-        condition: service_started
+      - alloydb-db
+      - ollama
     ports:
       - "80:80" # 読書メモ美麗UI / API用
     environment:

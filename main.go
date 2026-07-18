@@ -57,7 +57,7 @@ func main() {
 	// 静的フロントエンドルーティング
 	http.HandleFunc("/", serveIndex)
 	http.HandleFunc("/style.css", serveStyle)
-
+	
 	// APIルーティング
 	http.HandleFunc("/api/memo", handleAddMemo)
 	http.HandleFunc("/api/memos", handleGetMemos)
