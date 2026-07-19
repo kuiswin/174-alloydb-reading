@@ -79,29 +79,40 @@ func serveStyle(w http.ResponseWriter, r *http.Request) {
 }
 
 // Embeddingsを取得する関数
-func getEmbeddings(text string) ([]float32, error) {
-	requestBody, err := json.Marshal(map[string]string{
-		"model":  "all-minilm",
-		"prompt": text,
+func getEmbeddings(text string, isQuery bool) ([]float32, error) {
+	var prefix string
+	if isQuery {
+		prefix = "search_query: "
+	} else {
+		prefix = "search_document: "
+	}
+
+	requestBody, err := json.Marshal(map[string]interface{}{
+		"model": "nomic-embed-text",
+		"input": prefix + text,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := http.Post(ollamaURL+"/api/embeddings", "application/json", bytes.NewBuffer(requestBody))
+	resp, err := http.Post(ollamaURL+"/api/embed", "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	var result struct {
-		Embedding []float32 `json:"embedding"`
+		Embeddings [][]float32 `json:"embeddings"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	return result.Embedding, nil
+	if len(result.Embeddings) == 0 {
+		return nil, fmt.Errorf("no embeddings returned from Ollama")
+	}
+
+	return result.Embeddings[0], nil
 }
 
 // Postgresのvectorリテラルフォーマットに変換
@@ -140,7 +151,7 @@ func handleAddMemo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Ollamaからベクトルを取得
-	vector, err := getEmbeddings(req.Memo)
+	vector, err := getEmbeddings(req.Memo, false)
 	if err != nil {
 		log.Printf("Ollama embedding error: %v\n", err)
 		http.Error(w, "Failed to generate embeddings: "+err.Error(), http.StatusInternalServerError)
@@ -239,7 +250,7 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. AIセマンティック検索 (ベクトル、最大5件)
-	vector, err := getEmbeddings(query)
+	vector, err := getEmbeddings(query, true)
 	if err == nil {
 		vectorStr := vectorToString(vector)
 		vectorRows, err := db.Query("SELECT id, title, memo, created_at, (1 - (embedding <=> $1)) as score FROM reading_memos ORDER BY embedding <=> $1 LIMIT 5", vectorStr)
@@ -404,7 +415,7 @@ func handleSeed(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			for idx := range jobs {
 				item := samples[idx]
-				vector, err := getEmbeddings(item.Memo)
+				vector, err := getEmbeddings(item.Memo, false)
 				results <- jobResult{
 					title: item.Title,
 					memo:  item.Memo,
