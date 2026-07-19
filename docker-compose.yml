@@ -4,14 +4,21 @@ services:
     image: google/alloydbomni:15
     container_name: alloydb-db
     ports:
-      - "5432:5432" # Postgres標準ポート
+      - "127.0.0.1:5432:5432" # Postgres標準ポート（ホスト内ループバックにバインドし外部露出を制限）
     environment:
       - POSTGRES_DB=reading_db
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - LANG=C.UTF-8
       - LC_ALL=C.UTF-8
+    volumes:
+      - ./alloydb_data:/var/lib/postgresql/data
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2048M
 
   # 2. AlloyDB & pgvector 拡張機能の自動有効化 + テーブル初期化
   alloydb-init:
@@ -36,11 +43,11 @@ services:
             id VARCHAR(36) PRIMARY KEY,
             title VARCHAR(200) NOT NULL,
             memo TEXT NOT NULL,
-            embedding vector(384),
+            embedding vector(768),
             created_at TIMESTAMPTZ NOT NULL
           );' &&
-        psql -h alloydb-db -U postgres -d reading_db -c \"INSERT INTO reading_memos (id, title, memo, embedding, created_at) VALUES ('dummy1', 'dummy', 'dummy', array_fill(0::float4, ARRAY[384])::vector, now()), ('dummy2', 'dummy', 'dummy', array_fill(0::float4, ARRAY[384])::vector, now()) ON CONFLICT DO NOTHING;\" &&
-        psql -h alloydb-db -U postgres -d reading_db -c \"SET scann.allow_blocked_operations = true; CREATE INDEX IF NOT EXISTS reading_memos_scann_idx ON reading_memos USING scann (embedding cosine) WITH (num_leaves=1);\" &&
+        psql -h alloydb-db -U postgres -d reading_db -c \"INSERT INTO reading_memos (id, title, memo, embedding, created_at) VALUES ('dummy1', 'dummy', 'dummy', array_fill(0::float4, ARRAY[768])::vector, now()), ('dummy2', 'dummy', 'dummy', array_fill(0::float4, ARRAY[768])::vector, now()) ON CONFLICT DO NOTHING;\" &&
+        psql -h alloydb-db -U postgres -d reading_db -c \"SET scann.allow_blocked_operations = true; CREATE INDEX IF NOT EXISTS reading_memos_scann_idx ON reading_memos USING scann (embedding cosine) WITH (mode='MANUAL', num_leaves=4);\" &&
         psql -h alloydb-db -U postgres -d reading_db -c \"DELETE FROM reading_memos WHERE id LIKE 'dummy%';\" &&
         echo '🔥 AlloyDB Omni & pgvector/ScaNN initialization completed successfully!'
       "
@@ -50,10 +57,15 @@ services:
     image: ollama/ollama:latest
     container_name: ollama
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434" # ポートのローカルループバック制限
     volumes:
       - ollama_data:/root/.ollama
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2048M
 
   # 4. Ollama モデル自動プル(初期化)
   ollama-init:
@@ -67,8 +79,8 @@ services:
         until curl -s http://ollama:11434/api/tags >/dev/null; do
           sleep 2
         done &&
-        curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"all-minilm\"}' &&
-        echo '🤖 Ollama Embeddings Model (all-minilm) Loaded Successfully!'
+        curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"nomic-embed-text\"}' &&
+        echo '🤖 Ollama Embeddings Model (nomic-embed-text) Loaded Successfully!'
       "
 
   # 5. Go言語 REST API バックエンド
@@ -84,6 +96,11 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@alloydb-db:5432/reading_db?sslmode=disable
       - OLLAMA_URL=http://ollama:11434
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
 volumes:
   ollama_data:
