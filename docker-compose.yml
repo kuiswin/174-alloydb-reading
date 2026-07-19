@@ -9,6 +9,8 @@ services:
       - POSTGRES_DB=reading_db
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
     restart: always
 
   # 2. AlloyDB & pgvector 拡張機能の自動有効化 + テーブル初期化
@@ -37,7 +39,9 @@ services:
             embedding vector(384),
             created_at TIMESTAMPTZ NOT NULL
           );' &&
-        psql -h alloydb-db -U postgres -d reading_db -c \"SET scann.allow_blocked_operations = true; CREATE INDEX IF NOT EXISTS reading_memos_scann_idx ON reading_memos USING scann (embedding cosine) WITH (num_leaves=1);\" &&
+        psql -h alloydb-db -U postgres -d reading_db -c "INSERT INTO reading_memos (id, title, memo, embedding, created_at) VALUES ('dummy1', 'dummy', 'dummy', array_fill(0::float4, ARRAY[384])::vector, now()), ('dummy2', 'dummy', 'dummy', array_fill(0::float4, ARRAY[384])::vector, now()) ON CONFLICT DO NOTHING;" &&
+        psql -h alloydb-db -U postgres -d reading_db -c "SET scann.allow_blocked_operations = true; CREATE INDEX IF NOT EXISTS reading_memos_scann_idx ON reading_memos USING scann (embedding cosine) WITH (num_leaves=1);" &&
+        psql -h alloydb-db -U postgres -d reading_db -c "DELETE FROM reading_memos WHERE id LIKE 'dummy%';" &&
         echo '🔥 AlloyDB Omni & pgvector/ScaNN initialization completed successfully!'
       "
 
