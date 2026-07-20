@@ -36,6 +36,7 @@ services:
         psql -h alloydb-db -U postgres -d reading_db -c 'CREATE EXTENSION IF NOT EXISTS vector;' &&
         psql -h alloydb-db -U postgres -d reading_db -c 'CREATE EXTENSION IF NOT EXISTS alloydb_scann;' &&
         psql -h alloydb-db -U postgres -d reading_db -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;' &&
+        psql -h alloydb-db -U postgres -d reading_db -c 'CREATE EXTENSION IF NOT EXISTS pg_bigm;' &&
         psql -h alloydb-db -U postgres -d reading_db -c \"ALTER SYSTEM SET scann.enable_index_with_insufficient_data = 'on';\" &&
         psql -h alloydb-db -U postgres -d reading_db -c \"SELECT pg_reload_conf();\" &&
         psql -h alloydb-db -U postgres -d reading_db -c '
@@ -48,8 +49,9 @@ services:
           );' &&
         psql -h alloydb-db -U postgres -d reading_db -c \"INSERT INTO reading_memos (id, title, memo, embedding, created_at) VALUES ('dummy1', 'dummy', 'dummy', array_fill(0::float4, ARRAY[768])::vector, now()), ('dummy2', 'dummy', 'dummy', array_fill(0::float4, ARRAY[768])::vector, now()) ON CONFLICT DO NOTHING;\" &&
         psql -h alloydb-db -U postgres -d reading_db -c \"SET scann.allow_blocked_operations = true; CREATE INDEX IF NOT EXISTS reading_memos_scann_idx ON reading_memos USING scann (embedding cosine) WITH (mode='MANUAL', num_leaves=4);\" &&
+        psql -h alloydb-db -U postgres -d reading_db -c \"CREATE INDEX IF NOT EXISTS reading_memos_bigm_idx ON reading_memos USING gin (memo gin_bigm_ops);\" &&
         psql -h alloydb-db -U postgres -d reading_db -c \"DELETE FROM reading_memos WHERE id LIKE 'dummy%';\" &&
-        echo '🔥 AlloyDB Omni & pgvector/ScaNN initialization completed successfully!'
+        echo '🔥 AlloyDB Omni & pgvector/ScaNN/pg_bigm initialization completed successfully!'
       "
 
   # 3. Ollama (ローカルAI Embeddingsエンジン)
