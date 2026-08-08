@@ -247,6 +247,11 @@
             }
         }
 
+        function searchPreset(q) {
+            document.getElementById('search-query').value = q;
+            handleSearch(new Event('submit'));
+        }
+
         function clearSearch() {
             document.getElementById('search-query').value = '';
             document.getElementById('search-results-container').style.display = 'none';
