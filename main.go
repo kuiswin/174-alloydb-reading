@@ -43,6 +43,7 @@ func main() {
 			err = db.Ping()
 			if err == nil {
 				log.Println("🚀 Successfully connected to AlloyDB Omni!")
+				initDB(db)
 				break
 			}
 		}
@@ -53,6 +54,28 @@ func main() {
 		log.Fatalf("Fatal: Failed to connect to AlloyDB Omni: %v", err)
 	}
 	defer db.Close()
+
+func initDB(d *sql.DB) {
+	queries := []string{
+		"CREATE EXTENSION IF NOT EXISTS vector;",
+		"CREATE EXTENSION IF NOT EXISTS alloydb_scann;",
+		"CREATE EXTENSION IF NOT EXISTS pg_trgm;",
+		"CREATE EXTENSION IF NOT EXISTS pg_bigm;",
+		`CREATE TABLE IF NOT EXISTS reading_memos (
+			id VARCHAR(36) PRIMARY KEY,
+			title VARCHAR(200) NOT NULL,
+			memo TEXT NOT NULL,
+			embedding vector(768),
+			created_at TIMESTAMPTZ NOT NULL
+		);`,
+	}
+	for _, q := range queries {
+		if _, err := d.Exec(q); err != nil {
+			log.Printf("DB Init Notice: %v\n", err)
+		}
+	}
+	log.Println("✅ DB schema & extensions initialized successfully!")
+}
 
 	// 静的フロントエンドルーティング
 	http.HandleFunc("/", serveIndex)
