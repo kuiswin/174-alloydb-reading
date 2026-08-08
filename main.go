@@ -225,9 +225,12 @@ func handleGetMemos(w http.ResponseWriter, r *http.Request) {
 
 // SearchResult represents the comparison of search results
 type SearchResult struct {
-	Like   []Memo `json:"like"`
-	FTS    []Memo `json:"fts"`
-	Vector []Memo `json:"vector"`
+	Like     []Memo  `json:"like"`
+	FTS      []Memo  `json:"fts"`
+	Vector   []Memo  `json:"vector"`
+	LikeMs   float64 `json:"like_ms"`
+	FTSMs    float64 `json:"fts_ms"`
+	VectorMs float64 `json:"vector_ms"`
 }
 
 // AIセマンティック検索 ＆ 比較検索 (GET)
@@ -244,6 +247,7 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 	results.Vector = []Memo{}
 
 	// 1. LIKE検索 (部分一致、最大5件)
+	t1 := time.Now()
 	likeQuery := "%" + query + "%"
 	likeRows, err := db.Query("SELECT id, title, memo, created_at FROM reading_memos WHERE memo ILIKE $1 OR title ILIKE $1 ORDER BY created_at DESC LIMIT 5", likeQuery)
 	if err == nil {
@@ -257,8 +261,10 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Printf("LIKE search error: %v\n", err)
 	}
+	results.LikeMs = float64(time.Since(t1).Microseconds()) / 1000.0
 
 	// 2. 全文検索 / FTS (Tri-gram類似度、最大5件)
+	t2 := time.Now()
 	ftsRows, err := db.Query("SELECT id, title, memo, created_at, bigm_similarity(memo, $1) as score FROM reading_memos WHERE bigm_similarity(memo, $1) > 0 ORDER BY score DESC LIMIT 5", query)
 	if err == nil {
 		defer ftsRows.Close()
@@ -273,8 +279,10 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Printf("FTS search error: %v\n", err)
 	}
+	results.FTSMs = float64(time.Since(t2).Microseconds()) / 1000.0
 
 	// 3. AIセマンティック検索 (ベクトル、最大5件)
+	t3 := time.Now()
 	vector, err := getEmbeddings(query, true)
 	if err == nil {
 		vectorStr := vectorToString(vector)
@@ -295,6 +303,7 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Printf("Ollama embedding error: %v\n", err)
 	}
+	results.VectorMs = float64(time.Since(t3).Microseconds()) / 1000.0
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
