@@ -55,6 +55,22 @@ func main() {
 	}
 	defer db.Close()
 
+	// 静的フロントエンドルーティング
+	http.HandleFunc("/", serveIndex)
+	http.HandleFunc("/style.css", serveStyle)
+	
+	// APIルーティング
+	http.HandleFunc("/api/memo", handleAddMemo)
+	http.HandleFunc("/api/memos", handleGetMemos)
+	http.HandleFunc("/api/search", handleSearch)
+	http.HandleFunc("/api/seed", handleSeed)
+
+	log.Println("Go REST API Server starting on port 80...")
+	if err := http.ListenAndServe(":80", nil); err != nil {
+		log.Fatal(err)
+	}
+}
+
 func initDB(d *sql.DB) {
 	queries := []string{
 		"CREATE EXTENSION IF NOT EXISTS vector;",
@@ -75,22 +91,6 @@ func initDB(d *sql.DB) {
 		}
 	}
 	log.Println("✅ DB schema & extensions initialized successfully!")
-}
-
-	// 静的フロントエンドルーティング
-	http.HandleFunc("/", serveIndex)
-	http.HandleFunc("/style.css", serveStyle)
-	
-	// APIルーティング
-	http.HandleFunc("/api/memo", handleAddMemo)
-	http.HandleFunc("/api/memos", handleGetMemos)
-	http.HandleFunc("/api/search", handleSearch)
-	http.HandleFunc("/api/seed", handleSeed)
-
-	log.Println("Go REST API Server starting on port 80...")
-	if err := http.ListenAndServe(":80", nil); err != nil {
-		log.Fatal(err)
-	}
 }
 
 func serveIndex(w http.ResponseWriter, r *http.Request) {
