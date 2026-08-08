@@ -142,9 +142,18 @@
             }
         }
 
+        function searchPreset(q) {
+            document.getElementById('search-query').value = q;
+            doSearch(q);
+        }
+
         async function handleSearch(e) {
-            e.preventDefault();
+            if (e && e.preventDefault) e.preventDefault();
             const query = document.getElementById('search-query').value.trim();
+            doSearch(query);
+        }
+
+        async function doSearch(query) {
             if (!query) return;
 
             const btn = document.getElementById('btn-search');
@@ -245,11 +254,6 @@
                 btn.disabled = false;
                 btn.textContent = 'AI類似探索';
             }
-        }
-
-        function searchPreset(q) {
-            document.getElementById('search-query').value = q;
-            handleSearch(new Event('submit'));
         }
 
         function clearSearch() {
