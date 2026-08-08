@@ -124,6 +124,39 @@ h1 {
     box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3);
 }
 
+.preset-queries {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.preset-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.preset-btn {
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #c7d2fe;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+    background: rgba(99, 102, 241, 0.35);
+    border-color: rgba(99, 102, 241, 0.6);
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
 .search-results-container {
     margin-top: 1.5rem;
     border-top: 1px solid var(--border-color);
