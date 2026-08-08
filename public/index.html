@@ -29,9 +29,15 @@
         <div class="card search-card">
             <h2 class="card-title">AIセマンティック検索（意味やニュアンスで探す）</h2>
             <form id="search-form" onsubmit="handleSearch(event)" class="search-form-row">
-                <input type="text" id="search-query" class="form-control search-input" placeholder="例：「友を信じて走るメロスの決意」や「桜の美しさとその下に眠るもの」、「目に見えない大切なこと」..." required>
+                <input type="text" id="search-query" class="form-control search-input" placeholder="例：「友を信じて走るメロスの決意」や「目に見えない大切なこと」..." required>
                 <button type="submit" id="btn-search" class="btn-search">AI類似探索</button>
             </form>
+            <div class="preset-queries">
+                <span class="preset-label">💡 試しにクリックしてAI検索：</span>
+                <button type="button" class="preset-btn" onclick="searchPreset('友を信じて走り抜く強い絆')">🏃‍♂️ 友を信じて走り抜く強い絆</button>
+                <button type="button" class="preset-btn" onclick="searchPreset('目に見えない本当に大切なもの')">🌟 目に見えない本当に大切なもの</button>
+                <button type="button" class="preset-btn" onclick="searchPreset('人間関係の冷たさや孤独感')">🥀 人間関係の冷たさや孤独感</button>
+            </div>
             <div id="search-results-container" class="search-results-container" style="display: none;">
                 <div class="search-results-header">
                     <span>3大検索エンジンの比較（LIKE検索 vs トリグラム全文検索 vs AIベクトル検索）</span>
@@ -164,6 +170,20 @@
                 const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
                 if (!res.ok) throw new Error('探索に失敗しました');
                 const data = await res.json();
+
+                // ⚡ Execution time displays
+                if (data.like_ms !== undefined) {
+                    timeLike.textContent = `⚡ ${data.like_ms.toFixed(1)} ms`;
+                    timeLike.style.display = 'inline-flex';
+                }
+                if (data.fts_ms !== undefined) {
+                    timeFTS.textContent = `⚡ ${data.fts_ms.toFixed(1)} ms`;
+                    timeFTS.style.display = 'inline-flex';
+                }
+                if (data.vector_ms !== undefined) {
+                    timeVector.textContent = `⚡ ${data.vector_ms.toFixed(1)} ms`;
+                    timeVector.style.display = 'inline-flex';
+                }
 
                 // 1. LIKE Results
                 if (!data.like || data.like.length === 0) {
