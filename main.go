@@ -65,8 +65,12 @@ func main() {
 	http.HandleFunc("/api/search", handleSearch)
 	http.HandleFunc("/api/seed", handleSeed)
 
-	log.Println("Go REST API Server starting on port 80...")
-	if err := http.ListenAndServe(":80", nil); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("Go REST API Server starting on port %s...\n", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}
 }
