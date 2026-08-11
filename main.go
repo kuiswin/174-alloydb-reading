@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -114,15 +115,25 @@ func getVertexEmbeddings(text string) ([]float32, error) {
 		projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	}
 	if projectID == "" {
-		req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/project/project-id", nil)
-		if err == nil {
-			req.Header.Set("Metadata-Flavor", "Google")
-			client := &http.Client{Timeout: 2 * time.Second}
-			if resp, err := client.Do(req); err == nil && resp.StatusCode == 200 {
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(resp.Body)
-				resp.Body.Close()
-				projectID = strings.TrimSpace(buf.String())
+		projectID = os.Getenv("GCP_PROJECT")
+	}
+	if projectID == "" {
+		for _, url := range []string{
+			"http://metadata.google.internal/computeMetadata/v1/project/project-id",
+			"http://169.254.169.254/computeMetadata/v1/project/project-id",
+		} {
+			req, err := http.NewRequest("GET", url, nil)
+			if err == nil {
+				req.Header.Set("Metadata-Flavor", "Google")
+				client := &http.Client{Timeout: 3 * time.Second}
+				if resp, err := client.Do(req); err == nil && resp.StatusCode == 200 {
+					body, err := io.ReadAll(resp.Body)
+					resp.Body.Close()
+					if err == nil && len(body) > 0 {
+						projectID = strings.TrimSpace(string(body))
+						break
+					}
+				}
 			}
 		}
 	}
