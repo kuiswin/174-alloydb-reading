@@ -44,7 +44,7 @@ func main() {
 		if err == nil {
 			err = db.Ping()
 			if err == nil {
-				log.Println("🚀 Successfully connected to AlloyDB Omni!")
+				log.Println("🚀 Successfully connected to AlloyDB!")
 				initDB(db)
 				break
 			}
@@ -53,7 +53,7 @@ func main() {
 		time.Sleep(3 * time.Second)
 	}
 	if err != nil {
-		log.Fatalf("Fatal: Failed to connect to AlloyDB Omni: %v", err)
+		log.Fatalf("Fatal: Failed to connect to AlloyDB: %v", err)
 	}
 	defer db.Close()
 
