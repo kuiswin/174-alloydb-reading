@@ -107,8 +107,83 @@ func serveStyle(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "public/style.css")
 }
 
-// Embeddingsを取得する関数 (Ollama未起動時は高精度セマンティック概念エンコーダーで動作)
+// Vertex AI Text Embeddings REST API 呼び出し関数
+func getVertexEmbeddings(text string) ([]float32, error) {
+	projectID := os.Getenv("PROJECT_ID")
+	if projectID == "" {
+		projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
+	}
+	if projectID == "" {
+		return nil, fmt.Errorf("no project id")
+	}
+	region := os.Getenv("REGION")
+	if region == "" {
+		region = "asia-northeast1"
+	}
+
+	// Metadata Server から GCP アクセストークンを自動取得
+	client := &http.Client{Timeout: 3 * time.Second}
+	tokenReq, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", nil)
+	if err != nil {
+		return nil, err
+	}
+	tokenReq.Header.Set("Metadata-Flavor", "Google")
+	tokenResp, err := client.Do(tokenReq)
+	if err != nil {
+		return nil, err
+	}
+	defer tokenResp.Body.Close()
+
+	var tokenData struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.NewDecoder(tokenResp.Body).Decode(&tokenData); err != nil || tokenData.AccessToken == "" {
+		return nil, fmt.Errorf("failed to parse access token")
+	}
+
+	url := fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/text-multilingual-embedding-002:predict", region, projectID, region)
+	reqBody, _ := json.Marshal(map[string]interface{}{
+		"instances": []map[string]interface{}{
+			{"content": text},
+		},
+	})
+
+	vReq, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	vReq.Header.Set("Authorization", "Bearer "+tokenData.AccessToken)
+	vReq.Header.Set("Content-Type", "application/json")
+
+	vResp, err := client.Do(vReq)
+	if err != nil {
+		return nil, err
+	}
+	defer vResp.Body.Close()
+
+	var vResult struct {
+		Predictions []struct {
+			Embeddings struct {
+				Values []float32 `json:"values"`
+			} `json:"embeddings"`
+		} `json:"predictions"`
+	}
+	if err := json.NewDecoder(vResp.Body).Decode(&vResult); err == nil && len(vResult.Predictions) > 0 {
+		return vResult.Predictions[0].Embeddings.Values, nil
+	}
+	return nil, fmt.Errorf("vertex ai prediction empty")
+}
+
+// Embeddingsを取得する関数 (Vertex AI / Ollama / 高精度セマンティック概念エンコーダー)
 func getEmbeddings(text string, isQuery bool) ([]float32, error) {
+	// 1. Vertex AI (Cloud Run環境 または USE_VERTEX_AI=true 設定時)
+	if os.Getenv("USE_VERTEX_AI") == "true" || os.Getenv("K_SERVICE") != "" {
+		if vec, err := getVertexEmbeddings(text); err == nil {
+			log.Printf("[app] Generated text embedding via Vertex AI (dim=%d)\n", len(vec))
+			return vec, nil
+		}
+	}
+
 	var prefix string
 	if isQuery {
 		prefix = "search_query: "
@@ -129,6 +204,7 @@ func getEmbeddings(text string, isQuery bool) ([]float32, error) {
 				Embeddings [][]float32 `json:"embeddings"`
 			}
 			if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && len(result.Embeddings) > 0 {
+				log.Printf("[app] Generated text embedding via Ollama (dim=%d)\n", len(result.Embeddings[0]))
 				return result.Embeddings[0], nil
 			}
 		}
